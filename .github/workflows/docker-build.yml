@@ -25,25 +25,28 @@ jobs:
           versions=$(grep -v '^\s*$' PG_VERSIONS.txt | tr '\n' ' ')
           echo "versions=$versions" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push for each Postgres version
         run: |
           IMAGE="nurelmdevelopment/hetzner-storage-box-backup"
           TOOL_VERSION="${GITHUB_REF_NAME#v}"   # strip leading 'v' from tag
 
           for pg_version in ${{ steps.versions.outputs.versions }}; do
-            # pg16-1.0.0  (major version in tag, full version in build arg)
+            # pg16.14-1.0.0  (major.minor version in tag, full version in build arg)
             pg_major=$(echo "$pg_version" | cut -d. -f1,2)
             tag="${IMAGE}:pg${pg_major}-${TOOL_VERSION}"
             latest_tag="${IMAGE}:pg${pg_major}-latest"
 
-            echo "Building $tag (PG_VERSION=$pg_version) ..."
-            docker build \
+            echo "Building $tag (PG_VERSION=$pg_version) for linux/amd64,linux/arm64 ..."
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
               --build-arg PG_VERSION="$pg_version" \
               --tag "$tag" \
               --tag "$latest_tag" \
+              --push \
               .
 
-            docker push "$tag"
-            docker push "$latest_tag"
             echo "Pushed $tag and $latest_tag"
           done
