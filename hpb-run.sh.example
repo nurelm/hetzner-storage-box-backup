@@ -9,7 +9,7 @@
 #   5. Run: hpb-run.sh init
 #   6. Run: hpb-run.sh backup  (verify it works before enabling the cron)
 
-set -euo pipefail
+set -eo pipefail
 
 ENV_FILE="/home/backup/.env"
 IMAGE="nurelmdevelopment/hetzner-storage-box-backup:pg16-latest"
@@ -20,8 +20,15 @@ set -a
 source "$ENV_FILE"
 set +a
 
+# DOCKER_NETWORK is optional — only needed for backup (connecting to Postgres).
+# snapshots, restore, init, forget, tag work without it.
+NETWORK_ARG=""
+if [[ -n "${DOCKER_NETWORK:-}" ]]; then
+  NETWORK_ARG="--network $DOCKER_NETWORK"
+fi
+
 docker run --rm \
-  --network "$DOCKER_NETWORK" \
+  $NETWORK_ARG \
   -e POSTGRES_CONTAINER \
   -e POSTGRES_DB \
   -e POSTGRES_USER \

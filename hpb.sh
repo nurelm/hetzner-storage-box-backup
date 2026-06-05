@@ -60,6 +60,7 @@ Host ${STORAGEBOX_HOST}
   IdentityFile ${SSH_KEY}
   StrictHostKeyChecking accept-new
   UserKnownHostsFile /tmp/hpb_known_hosts
+  LogLevel ERROR
 EOF
 chmod 600 "$HOME/.ssh/config"
 
@@ -96,14 +97,14 @@ case "$cmd" in
     fi
     echo "Initializing restic repo at $RESTIC_REPOSITORY ..."
     restic init
-    echo "Done. You can now run: hpb backup"
+    echo "Done. Next step: run this container with the 'backup' command."
     ;;
 
   # --------------------------------------------------------------------------
   backup)
     if ! repo_initialized; then
       echo "ERROR: restic repo not initialized."
-      echo "Run first: hpb-run.sh init"
+      echo "Run this container with the 'init' command first."
       exit 1
     fi
 
@@ -150,8 +151,8 @@ case "$cmd" in
   restore)
     snapshot_id="${2:-}"
     if [[ -z "$snapshot_id" ]]; then
-      echo "Usage: hpb-run.sh restore <SNAPSHOT_ID>"
-      echo "List available snapshots with: hpb-run.sh snapshots"
+      echo "Usage: <this container> restore <SNAPSHOT_ID>"
+      echo "List available snapshots with: <this container> snapshots"
       exit 1
     fi
 
@@ -178,7 +179,7 @@ case "$cmd" in
     snapshot_id="${2:-}"
     tag_name="${3:-}"
     if [[ -z "$snapshot_id" || -z "$tag_name" ]]; then
-      echo "Usage: hpb-run.sh tag <SNAPSHOT_ID> <TAG>"
+      echo "Usage: <this container> tag <SNAPSHOT_ID> <TAG>"
       echo "Tags used by convention: last-known-good, suspect"
       exit 1
     fi
@@ -190,7 +191,7 @@ case "$cmd" in
   *)
     echo "hetzner-storage-box-backup"
     echo ""
-    echo "Usage: hpb-run.sh <command> [args]"
+    echo "Usage: <this container> <command> [args]"
     echo ""
     echo "Commands:"
     echo "  init                       Initialize the restic repo (idempotent)"
@@ -200,7 +201,7 @@ case "$cmd" in
     echo "  restore <SNAPSHOT_ID>      Restore a snapshot to stdout (pipe to psql)"
     echo "  tag <SNAPSHOT_ID> <TAG>    Add a tag to a snapshot (e.g. last-known-good, suspect)"
     echo ""
-    echo "See README.md or https://github.com/nurelm/hetzner-storage-box-backup"
+    echo "See https://github.com/nurelm/hetzner-storage-box-backup"
     exit 1
     ;;
 
