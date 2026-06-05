@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# hpb-run.sh — host-side wrapper for hetzner-storage-box-backup
+#
+# SETUP:
+#   1. Copy this file to /usr/local/bin/hpb-run.sh
+#   2. chmod +x /usr/local/bin/hpb-run.sh
+#   3. Copy example.env to /home/<user>/.env and fill in your values
+#   4. Update ENV_FILE and IMAGE below if needed
+#   5. Run: hpb-run.sh init
+#   6. Run: hpb-run.sh backup  (verify it works before enabling the cron)
+
+set -euo pipefail
+
+ENV_FILE="/home/backup/.env"
+IMAGE="nurelmdevelopment/hetzner-storage-box-backup:pg16-latest"
+
+# Load environment variables from .env
+set -a
+# shellcheck source=/dev/null
+source "$ENV_FILE"
+set +a
+
+docker run --rm \
+  --network "$DOCKER_NETWORK" \
+  -e POSTGRES_CONTAINER \
+  -e POSTGRES_DB \
+  -e POSTGRES_USER \
+  -e POSTGRES_PASSWORD \
+  -e STORAGEBOX_HOST \
+  -e STORAGEBOX_USER \
+  -e STORAGEBOX_REPO_PATH \
+  -e RESTIC_PASSWORD \
+  -e KEEP_HOURLY \
+  -e KEEP_DAILY \
+  -e KEEP_WEEKLY \
+  -v "${STORAGEBOX_SSH_KEY_PATH}":/tmp/storagebox_key:ro \
+  "$IMAGE" \
+  "$@"

@@ -1,0 +1,24 @@
+# Environment and secrets — never in the image
+.env
+*.env
+example.env
+
+# SSH keys
+*.pem
+id_*
+storagebox_key
+
+# Host-side wrapper — not needed inside the image
+hpb-run.sh.example
+
+# Git and GitHub
+.git
+.gitignore
+.github
+
+# Docs
+README.md
+PG_VERSIONS.txt
+
+# Mac
+.DS_Store

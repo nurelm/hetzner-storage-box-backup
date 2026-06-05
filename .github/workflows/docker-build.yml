@@ -1,0 +1,49 @@
+name: Build and push to Docker Hub
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Read Postgres versions
+        id: versions
+        run: |
+          versions=$(grep -v '^\s*$' PG_VERSIONS.txt | tr '\n' ' ')
+          echo "versions=$versions" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push for each Postgres version
+        run: |
+          IMAGE="nurelmdevelopment/hetzner-storage-box-backup"
+          TOOL_VERSION="${GITHUB_REF_NAME#v}"   # strip leading 'v' from tag
+
+          for pg_version in ${{ steps.versions.outputs.versions }}; do
+            # pg16-1.0.0  (major version in tag, full version in build arg)
+            pg_major=$(echo "$pg_version" | cut -d. -f1)
+            tag="${IMAGE}:pg${pg_major}-${TOOL_VERSION}"
+            latest_tag="${IMAGE}:pg${pg_major}-latest"
+
+            echo "Building $tag (PG_VERSION=$pg_version) ..."
+            docker build \
+              --build-arg PG_VERSION="$pg_version" \
+              --tag "$tag" \
+              --tag "$latest_tag" \
+              .
+
+            docker push "$tag"
+            docker push "$latest_tag"
+            echo "Pushed $tag and $latest_tag"
+          done

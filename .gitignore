@@ -1,0 +1,11 @@
+# local env files — never commit these
+.env
+*.env
+
+# SSH keys — never commit these
+*.pem
+id_*
+storagebox_key
+
+# Mac
+.DS_Store
