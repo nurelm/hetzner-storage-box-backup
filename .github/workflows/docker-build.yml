@@ -32,7 +32,7 @@ jobs:
 
           for pg_version in ${{ steps.versions.outputs.versions }}; do
             # pg16-1.0.0  (major version in tag, full version in build arg)
-            pg_major=$(echo "$pg_version" | cut -d. -f1)
+            pg_major=$(echo "$pg_version" | cut -d. -f1,2)
             tag="${IMAGE}:pg${pg_major}-${TOOL_VERSION}"
             latest_tag="${IMAGE}:pg${pg_major}-latest"
 
