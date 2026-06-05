@@ -165,10 +165,15 @@ case "$cmd" in
     # We use a tmpdir inside the container (gone when container dies).
 
     TMPDIR=$(mktemp -d)
-    restic restore "$snapshot_id" --target "$TMPDIR"
+    restic restore "$snapshot_id" --target "$TMPDIR" >&2
 
-    # The dump was stored as dump.sql
-    cat "$TMPDIR/dump.sql"
+    DUMP="$TMPDIR/dump.sql"
+    if [[ ! -s "$DUMP" ]]; then
+      echo "ERROR: restore produced an empty or missing dump file." >&2
+      exit 1
+    fi
+
+    cat "$DUMP"
     ;;
 
   # --------------------------------------------------------------------------
