@@ -48,10 +48,24 @@ fi
 cp "$SSH_KEY_SRC" "$SSH_KEY"
 chmod 600 "$SSH_KEY"
 
+# --- SSH config inside the container ----------------------------------------
+# restic uses the system SSH client for SFTP. We write a per-host config so
+# restic doesn't need any extra flags — it just calls ssh and the config
+# handles the key, host checking, and known_hosts location.
+
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
+cat > "$HOME/.ssh/config" << EOF
+Host ${STORAGEBOX_HOST}
+  IdentityFile ${SSH_KEY}
+  StrictHostKeyChecking accept-new
+  UserKnownHostsFile /tmp/hpb_known_hosts
+EOF
+chmod 600 "$HOME/.ssh/config"
+
 # --- restic environment ------------------------------------------------------
 
 export RESTIC_REPOSITORY="sftp:${STORAGEBOX_USER}@${STORAGEBOX_HOST}:${STORAGEBOX_REPO_PATH}"
-export RESTIC_RSH="ssh -i ${SSH_KEY} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null"
 # RESTIC_PASSWORD is already in the environment
 
 # --- Retention policy (convention over configuration) -----------------------
