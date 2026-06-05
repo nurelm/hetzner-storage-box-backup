@@ -1,6 +1,7 @@
 # local env files — never commit these
 .env
 *.env
+!example.env
 
 # SSH keys — never commit these
 *.pem
