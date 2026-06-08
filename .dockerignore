@@ -1,14 +1,8 @@
-# Environment and secrets — never in the image
-.env
-*.env
-example.env
+# Secrets and config — never in the image
+.hpb
+example.hpb
 
-# SSH keys
-*.pem
-id_*
-storagebox_key
-
-# Host-side wrapper — not needed inside the image
+# Host-side files — not needed inside the image
 hpb-run.sh.example
 
 # Git and GitHub

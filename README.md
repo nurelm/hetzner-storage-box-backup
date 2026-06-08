@@ -8,7 +8,7 @@ Runs as an ephemeral container on the host. No persistent state, no sidecar, no 
 
 ```
 cron (host)
-  └── hpb-run.sh (host wrapper)
+  └── hpb-run (host wrapper)
         └── docker run nurelmdevelopment/hetzner-storage-box-backup:pg16.14-latest backup
               ├── pg_dump (stdout) ──────────────────────────────────────┐
               └── restic backup --stdin ← dump piped in, no disk writes  │
@@ -65,68 +65,87 @@ Verify the key works (expect "PTY allocation request failed" — that's normal, 
 ssh -i ~/.ssh/storagebox_key uXXXXX@uXXXXX.your-storagebox.de
 ```
 
-### 2. Create the `.env` file
+### 2. Install `hpb-run`
 
 ```bash
-cp example.env /root/.env    # or /home/backup/.env — wherever your hpb-run.sh points
-chmod 600 /root/.env
-# edit and fill in all values
+cp hpb-run.sh.example /usr/local/bin/hpb-run
+chmod +x /usr/local/bin/hpb-run
 ```
 
-See [Environment variables](#environment-variables) for the full reference.
+`hpb-run` is installed once and shared across projects. All project-specific config lives in `.hpb`.
 
-### 3. Install `hpb-run.sh`
+### 3. Create the `.hpb` config file
 
 ```bash
-cp hpb-run.sh.example /usr/local/bin/hpb-run.sh
-chmod +x /usr/local/bin/hpb-run.sh
-# edit ENV_FILE and IMAGE to match your setup
+cp example.hpb .hpb
+chmod 600 .hpb
+# edit .hpb and fill in all values
 ```
+
+The `.hpb` file contains everything: the Docker image to use, credentials, and connection details. See [Configuration](#configuration) for the full reference.
 
 ### 4. Initialize the restic repo
 
 Runs once per `STORAGEBOX_REPO_PATH`. Idempotent — safe to run again if unsure.
 
 ```bash
-hpb-run.sh init
+hpb-run init
 ```
 
 ### 5. Verify the first backup
 
 ```bash
-hpb-run.sh backup
-hpb-run.sh snapshots    # should list one snapshot
+hpb-run backup
+hpb-run snapshots    # should list one snapshot
 ```
 
 ### 6. Install the cron jobs
 
 Two entries in `/etc/cron.d/hpb`: one for hourly backups, one for the daily prune.
 
+**Single project** (`.hpb` in a fixed directory):
 ```
-0 * * * * root /usr/local/bin/hpb-run.sh backup >> /var/log/hpb.log 2>&1
-0 3 * * * root /usr/local/bin/hpb-run.sh forget >> /var/log/hpb.log 2>&1
+0 * * * * deploy cd /path/to/project && hpb-run backup >> /var/log/hpb.log 2>&1
+0 3 * * * deploy cd /path/to/project && hpb-run forget >> /var/log/hpb.log 2>&1
 ```
 
-Adjust the user (`root` above) to whoever owns the `.env` and the SSH key.
+**Multiple projects from the same user** (using `--config`):
+```
+0 * * * * deploy hpb-run --config=/etc/hpb/project-a.hpb backup >> /var/log/hpb-a.log 2>&1
+0 * * * * deploy hpb-run --config=/etc/hpb/project-b.hpb backup >> /var/log/hpb-b.log 2>&1
+0 3 * * * deploy hpb-run --config=/etc/hpb/project-a.hpb forget >> /var/log/hpb-a.log 2>&1
+0 3 * * * deploy hpb-run --config=/etc/hpb/project-b.hpb forget >> /var/log/hpb-b.log 2>&1
+```
+
+Make sure the log file(s) exist and are writable by the cron user before enabling — otherwise the shell can't open the log and the command never runs:
+
+```bash
+touch /var/log/hpb.log && chown deploy:deploy /var/log/hpb.log
+```
 
 ## Commands
 
-All commands are passed as the first argument to the container. `hpb-run.sh` is the recommended wrapper, but you can invoke the container directly.
+`hpb-run` reads config from `.hpb` in the current directory. Override with `--config=<path>`:
+
+```bash
+hpb-run backup                                      # uses ./.hpb
+hpb-run --config=/etc/hpb/myproject.hpb backup     # uses the specified config
+```
 
 ### `init`
 
 Initializes the restic repo in the Storage Box. Idempotent — safe to run multiple times.
 
 ```bash
-hpb-run.sh init
+hpb-run init
 ```
 
 ### `backup`
 
-Dumps the configured Postgres database and stores it in the restic repo. Fails with a clear message if `init` hasn't been run yet. Requires `DOCKER_NETWORK` to be set (the container needs to reach the Postgres container).
+Dumps the configured Postgres database and stores it in the restic repo. Fails with a clear message if `init` hasn't been run yet. Requires `DOCKER_NETWORK` to be set.
 
 ```bash
-hpb-run.sh backup
+hpb-run backup
 ```
 
 ### `forget`
@@ -134,10 +153,10 @@ hpb-run.sh backup
 Applies the retention policy and prunes unreferenced data from the repo. Run daily — not on every backup, as `--prune` is expensive.
 
 ```bash
-hpb-run.sh forget
+hpb-run forget
 ```
 
-Default retention policy (override via env vars):
+Default retention policy (override via config):
 - Last 24 hourly snapshots
 - Last 14 daily snapshots
 - Last 8 weekly snapshots
@@ -148,7 +167,7 @@ Default retention policy (override via env vars):
 Lists all snapshots in the repo, including their tags. Does not require `DOCKER_NETWORK`.
 
 ```bash
-hpb-run.sh snapshots
+hpb-run snapshots
 ```
 
 Snapshots tagged `suspect` may contain corrupted data — do not restore from them without understanding why they were tagged.
@@ -159,30 +178,30 @@ Restores a snapshot and prints the SQL dump to stdout. Does not require `DOCKER_
 
 ```bash
 # List snapshots first
-hpb-run.sh snapshots
+hpb-run snapshots
 
-# Restore to stdout and pipe to psql
-hpb-run.sh restore abc123def | psql -U postgres your_database_name
+# Restore and import — if Postgres is on the host:
+hpb-run restore abc123def | psql -U postgres your_database_name
 
-# If Postgres runs in a Docker container on the same host:
-hpb-run.sh restore abc123def | docker exec -i <postgres-container> psql -U postgres your_database_name
+# Restore and import — if Postgres runs in a Docker container:
+hpb-run restore abc123def | docker exec -i <postgres-container> psql -U postgres your_database_name
 ```
 
-**Important:** if the target database already has content, drop and recreate the schema first to avoid foreign key conflicts during the restore:
+**Important:** if the target database already has content, drop and recreate the schema first to avoid foreign key conflicts:
 
 ```bash
 docker exec -i <postgres-container> psql -U postgres -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" your_database_name
 ```
 
-The dump uses `--clean --if-exists` semantics, which works cleanly against an empty schema. Against a populated database with foreign keys, the drop order can cause conflicts — the `DROP SCHEMA CASCADE` above resolves this.
+The dump uses `--clean --if-exists` semantics, which works cleanly against an empty schema but can hit foreign key ordering issues against a populated database.
 
 ### `tag <SNAPSHOT_ID> <TAG>`
 
 Adds a tag to a snapshot. Does not require `DOCKER_NETWORK`.
 
 ```bash
-hpb-run.sh tag abc123def last-known-good
-hpb-run.sh tag abc123def suspect
+hpb-run tag abc123def last-known-good
+hpb-run tag abc123def suspect
 ```
 
 Tags used by convention:
@@ -192,27 +211,30 @@ Tags used by convention:
 | `last-known-good` | This snapshot was used to recover production and the app was verified healthy afterward. Preserved permanently by the retention policy. |
 | `suspect` | This snapshot was taken after a data incident and may contain corrupted data. Rotates normally with the retention policy alongside the snapshot itself. |
 
-## Environment variables
+## Configuration
 
-### Required for `backup`
+All config lives in a single `.hpb` file. Copy `example.hpb` to get started.
+
+### Required
 
 | Variable | Used by | Description |
 |----------|---------|-------------|
-| `DOCKER_NETWORK` | `hpb-run.sh` | Docker network where the Postgres container lives. Not needed for `snapshots`, `restore`, `tag`, `init`, `forget`. |
-| `POSTGRES_CONTAINER` | container | Name of the Postgres container on the Docker network |
+| `IMAGE` | `hpb-run` | Docker image to use. Pin to a specific version in production. |
+| `STORAGEBOX_SSH_KEY_PATH` | `hpb-run` | Absolute path to the SSH private key on the host |
 | `POSTGRES_DB` | container | Database name to back up |
 | `POSTGRES_USER` | container | Postgres user |
 | `POSTGRES_PASSWORD` | container | Postgres password |
-
-### Required for all commands
-
-| Variable | Used by | Description |
-|----------|---------|-------------|
-| `STORAGEBOX_SSH_KEY_PATH` | `hpb-run.sh` | Absolute path to the SSH private key on the host |
 | `STORAGEBOX_HOST` | container | Storage Box hostname (e.g. `uXXXXX.your-storagebox.de`) |
 | `STORAGEBOX_USER` | container | Storage Box username (same `uXXXXX` as in the hostname) |
 | `STORAGEBOX_REPO_PATH` | container | Directory inside the Storage Box for this project's restic repo (e.g. `/pbrain-production`) |
 | `RESTIC_PASSWORD` | container | Passphrase for restic repo encryption. **Not** the Storage Box password. Losing this makes your backups unreadable. |
+
+### Required for `backup` only
+
+| Variable | Used by | Description |
+|----------|---------|-------------|
+| `DOCKER_NETWORK` | `hpb-run` | Docker network where the Postgres container lives |
+| `POSTGRES_CONTAINER` | container | Name of the Postgres container on the Docker network |
 
 ### Optional (retention policy)
 

@@ -1,24 +1,48 @@
 #!/usr/bin/env bash
-# hpb-run.sh — host-side wrapper for hetzner-storage-box-backup
+# hpb-run.sh.example — host-side wrapper for hetzner-storage-box-backup
 #
 # SETUP:
-#   1. Copy this file to /usr/local/bin/hpb-run.sh
-#   2. chmod +x /usr/local/bin/hpb-run.sh
-#   3. Copy example.env to /home/<user>/.env and fill in your values
-#   4. Update ENV_FILE and IMAGE below if needed
-#   5. Run: hpb-run.sh init
-#   6. Run: hpb-run.sh backup  (verify it works before enabling the cron)
+#   1. Copy this file to /usr/local/bin/hpb-run (no extension)
+#   2. chmod +x /usr/local/bin/hpb-run
+#   3. Copy example.hpb to .hpb in the directory where you'll run hpb-run, and fill in values
+#   4. Run: hpb-run init
+#   5. Run: hpb-run backup  (verify it works before enabling the cron)
 
 set -eo pipefail
 
-ENV_FILE="/home/backup/.env"
-IMAGE="nurelmdevelopment/hetzner-storage-box-backup:pg16-latest"
+# ---------------------------------------------------------------------------
+# Config file: reads all settings from .hpb in the current directory.
+# Override with --config=<path> to use a different config file.
+# ---------------------------------------------------------------------------
 
-# Load environment variables from .env
+HPB_CONFIG=".hpb"
+ARGS=()
+
+for arg in "$@"; do
+  case "$arg" in
+    --config=*)
+      HPB_CONFIG="${arg#--config=}"
+      ;;
+    *)
+      ARGS+=("$arg")
+      ;;
+  esac
+done
+
+if [[ ! -f "$HPB_CONFIG" ]]; then
+  echo "ERROR: config file not found: $HPB_CONFIG" >&2
+  echo "Create a .hpb file in the current directory, or use --config=<path>" >&2
+  exit 1
+fi
+
+# Load all settings from the config file
 set -a
 # shellcheck source=/dev/null
-source "$ENV_FILE"
+source "$HPB_CONFIG"
 set +a
+
+# Validate required settings
+[[ -z "${IMAGE:-}" ]] && { echo "ERROR: IMAGE not set in $HPB_CONFIG" >&2; exit 1; }
 
 # DOCKER_NETWORK is optional — only needed for backup (connecting to Postgres).
 # snapshots, restore, init, forget, tag work without it.
@@ -42,4 +66,4 @@ docker run --rm \
   -e KEEP_WEEKLY \
   -v "${STORAGEBOX_SSH_KEY_PATH}":/tmp/storagebox_key:ro \
   "$IMAGE" \
-  "$@"
+  "${ARGS[@]}"

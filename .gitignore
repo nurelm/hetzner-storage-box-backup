@@ -1,12 +1,8 @@
-# local env files — never commit these
-.env
-*.env
-!example.env
-
+# Project config — contains secrets, never commit
+.hpb
+ 
 # SSH keys — never commit these
 *.pem
 id_*
 storagebox_key
-
-# Mac
-.DS_Store
+ 

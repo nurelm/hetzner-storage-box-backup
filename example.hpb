@@ -1,20 +1,24 @@
-# hetzner-storage-box-backup — environment configuration
-# Copy to ~/.env (or wherever your hpb-run.sh points to) and fill in values.
-# Permissions: chmod 600 ~/.env
+# hetzner-storage-box-backup config
+# Copy to .hpb in the directory where you'll run hpb-run (or use --config=<path>).
+# Permissions: chmod 600 .hpb
 #
 # See README.md for full documentation.
 
 # ---------------------------------------------------------------------------
-# Docker (used by hpb-run.sh on the host, not inside the container)
+# Docker image (required)
+# ---------------------------------------------------------------------------
+
+# Pin to a specific version in production. Update here to upgrade.
+# Available tags: https://hub.docker.com/r/nurelmdevelopment/hetzner-storage-box-backup/tags
+IMAGE=nurelmdevelopment/hetzner-storage-box-backup:pg16.14-1.0.5
+
+# ---------------------------------------------------------------------------
+# Docker (only needed for backup — not for snapshots, restore, tag, init, forget)
 # ---------------------------------------------------------------------------
 
 # The Docker network where the Postgres container is reachable.
 # Find yours with: docker network ls
 DOCKER_NETWORK=kamal
-
-# Absolute path to the SSH private key authorized on the Storage Box.
-# Never put the key contents here — point to the file.
-STORAGEBOX_SSH_KEY_PATH=/home/backup/.ssh/storagebox_key
 
 # ---------------------------------------------------------------------------
 # Postgres (used inside the container)
@@ -36,14 +40,17 @@ POSTGRES_PASSWORD=changeme
 # ---------------------------------------------------------------------------
 
 # Storage Box hostname and username (they share the same uXXXXX identifier).
-# Find both in the Hetzner Robot panel under "Storage Boxes".
+# Find both in the Hetzner Console under Storage Boxes.
 STORAGEBOX_HOST=uXXXXX.your-storagebox.de
 STORAGEBOX_USER=uXXXXX
 
 # Path inside the Storage Box where this project's restic repo lives.
 # Use a separate path per project if you share one Storage Box.
-# Example: /pbrain-production, /other-project-production
 STORAGEBOX_REPO_PATH=/your-project-name
+
+# Absolute path to the SSH private key on the host (authorized on the Storage Box).
+# Never put the key contents here — point to the file.
+STORAGEBOX_SSH_KEY_PATH=/root/.ssh/storagebox_key
 
 # ---------------------------------------------------------------------------
 # restic (used inside the container)
@@ -51,7 +58,7 @@ STORAGEBOX_REPO_PATH=/your-project-name
 
 # Passphrase used to encrypt the restic repo.
 # This is NOT the Storage Box password — it's a separate encryption key.
-# Store it somewhere safe (e.g. Google Secret Manager). If you lose it,
+# Store it somewhere safe (e.g. a password manager). If you lose it,
 # your backups are unreadable.
 RESTIC_PASSWORD=changeme
 
