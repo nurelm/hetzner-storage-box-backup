@@ -106,16 +106,18 @@ Two entries in `/etc/cron.d/hpb`: one for hourly backups, one for the daily prun
 **Single project** (`.hpb` in a fixed directory):
 ```
 0 * * * * deploy cd /path/to/project && hpb-run backup >> /var/log/hpb.log 2>&1
-0 3 * * * deploy cd /path/to/project && hpb-run forget >> /var/log/hpb.log 2>&1
+30 3 * * * deploy cd /path/to/project && hpb-run forget >> /var/log/hpb.log 2>&1
 ```
 
 **Multiple projects from the same user** (using `--config`):
 ```
 0 * * * * deploy hpb-run --config=/etc/hpb/project-a.hpb backup >> /var/log/hpb-a.log 2>&1
 0 * * * * deploy hpb-run --config=/etc/hpb/project-b.hpb backup >> /var/log/hpb-b.log 2>&1
-0 3 * * * deploy hpb-run --config=/etc/hpb/project-a.hpb forget >> /var/log/hpb-a.log 2>&1
-0 3 * * * deploy hpb-run --config=/etc/hpb/project-b.hpb forget >> /var/log/hpb-b.log 2>&1
+30 3 * * * deploy hpb-run --config=/etc/hpb/project-a.hpb forget >> /var/log/hpb-a.log 2>&1
+30 3 * * * deploy hpb-run --config=/etc/hpb/project-b.hpb forget >> /var/log/hpb-b.log 2>&1
 ```
+
+The `forget` command shouldn't run too close to the backup time or the repo might be locked.
 
 Make sure the log file(s) exist and are writable by the cron user before enabling — otherwise the shell can't open the log and the command never runs:
 
